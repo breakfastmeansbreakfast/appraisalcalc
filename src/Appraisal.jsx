@@ -2,6 +2,7 @@
 import React, { Component } from 'react';
 import logo from './logo.svg';
 import './App.css';
+
 const _ = require('lodash');
 
 const calcInputs = {
@@ -16,11 +17,11 @@ const calcInputs = {
     bedno3: 15,
   },
   yield: 0.0425,
+  purchasersCosts: 0.06,
   managementCost: 0.225,
   stabalisationPeriod: 28,
   growthRate: 0.035,
   growthPeriod: 27, // pre planning period + planning period + tender period + contruction period
-  get growth() { return Math.pow((1 + this.growthRate / 12), (this.growthPeriod)); },
 };
 
 const rentArray = (unitInput) => {
@@ -34,12 +35,6 @@ const rentArray = (unitInput) => {
   return rentarray;
 };
 
-// get rent arrays for 1 - 3 beds
-// console.log(rentArray(calcInputs.rents.rent1bed));
-// console.log(rentArray(calcInputs.rents.rent2bed));
-// console.log(rentArray(calcInputs.rents.rent3bed));
-
-// get rent array for sum to calculate. pass in rantArray(1bed / 2bed) to get grown results
 const rentTotal = (unitType, unitTypeNo) => {
   const rentTotalArray = [];
   const rentroll = [];
@@ -61,74 +56,68 @@ const oneBedArray = rentArray(calcInputs.rents.rent1bed);
 const twoBedArray = rentArray(calcInputs.rents.rent2bed);
 const threeBedArray = rentArray(calcInputs.rents.rent3bed);
 
-// create array of rents to be valued
-// console.log(rentTotal(oneBedArray, calcInputs.units.bedno1));
 
-// see https://www.linkedin.com/pulse/javascript-find-object-array-based-objects-property-rafael
+// calculate rent roll period before stabalistion
 const interimRevenue = () => {
   const interim1bed = rentTotal(oneBedArray, calcInputs.units.bedno1);
   const interim2bed = rentTotal(twoBedArray, calcInputs.units.bedno2);
   const interim3bed = rentTotal(threeBedArray, calcInputs.units.bedno3);
 
-  const total = interim1bed.rentTotalAmount + interim2bed.rentTotalAmount + interim3bed.rentTotalAmount
-
-  return (total);
+  const total = interim1bed.rentTotalAmount + interim2bed.rentTotalAmount + interim3bed.rentTotalAmount;
+  const rentData = [total, interim1bed, interim2bed, interim3bed];
+  return rentData;
 };
 
-console.log(interimRevenue());
-
-
-// get inputs and calculate profit
-const calc = () => {
-  let grown1bed = calcInputs.rents.rent1bed * calcInputs.growth;
-  let grown2bed = calcInputs.rents.rent2bed * calcInputs.growth;
-  let grown3bed = calcInputs.rents.rent3bed * calcInputs.growth;
+// calculate stabalised sale
+const capRevenue = () => {
+  const grown1bed = oneBedArray[calcInputs.growthPeriod + calcInputs.stabalisationPeriod - 1];
+  const grown2bed = twoBedArray[calcInputs.growthPeriod + calcInputs.stabalisationPeriod - 1];
+  const grown3bed = threeBedArray[calcInputs.growthPeriod + calcInputs.stabalisationPeriod - 1];
 
   const rentRevenue =
   grown1bed * calcInputs.units.bedno1 +
   grown2bed * calcInputs.units.bedno2 +
   grown3bed * calcInputs.units.bedno3;
 
-  let stabalisedRevenue = // aka investment sale, not ok
-  ((rentRevenue / calcInputs.yield) * 12);
+  const grossStabalisedRevenue = ((rentRevenue / calcInputs.yield) * 12);
 
-  // need to get interim rev to match *next job
-  const interimRevenue = ((rentRevenue)) * (calcInputs.stabalisationPeriod); // not ok
+  const purchasersCosts = calcInputs.purchasersCosts;
+  const managementCost = calcInputs.managementCost;
 
-  const totalRevenue = (stabalisedRevenue + interimRevenue);
-  return totalRevenue.toLocaleString('en-GB', { style: 'currency', currency: 'GBP' });
+  let netTotalRevenue = grossStabalisedRevenue * (1 - purchasersCosts);
+  netTotalRevenue = netTotalRevenue * (1 - managementCost);
+  return netTotalRevenue;
 };
 
-const listRents = (unitInput) => {
-  const rentItems = rentArray(unitInput).map((rent) => <li key={rent.id}>{rent}</li>);
-  return (
-    <ul>{rentItems}</ul>
-  );
-};
+// const listRents = (unitInput) => {
+//   const rentItems = rentArray(unitInput).map((rent) => <li key={rent.id}>{rent}</li>);
+//   return (
+//     <ul>{rentItems}</ul>
+//   );
+// };
 
-const listTotalRents = (unitInput) => {
-  const rentItems = rentArray(unitInput).map((rent) => <li key={rent.id}>{rent}</li>);
-  return (
-    <ul>{rentItems}</ul>
-  );
-};
+// <p>{rentArray(calcInputs.rents.rent1bed)[0]}</p>
+// <ul>
+//   {listRents(calcInputs.rents.rent1bed)}
+// </ul>
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Appraisal extends Component {
   render() {
+    const capRev = capRevenue().toLocaleString('en-GB', { style: 'currency', currency: 'GBP' });
+    const intRev = interimRevenue()[0].toLocaleString('en-GB', { style: 'currency', currency: 'GBP' });
+    const totalRev = (interimRevenue()[0] + capRevenue()).toLocaleString('en-GB', { style: 'currency', currency: 'GBP' });
+
     return (
       <div className="App">
         <header className="App-header">
           <img src={logo} className="App-logo" alt="logo" />
           <h1>Appraisal Calc</h1>
-          <p>{rentArray(calcInputs.rents.rent1bed)[0]}</p>
-          <ul>
-            {listRents(calcInputs.rents.rent1bed)}
-          </ul>
-          <p>Rental income: {calc()}
+
+          <p>Rental income: {capRev}
           </p>
-          <p>Capitalisation figure: </p>
-          <p>Total revenue: </p>
+          <p>Capitalisation figure: {intRev}</p>
+          <p>Total revenue: {totalRev}</p>
           <a
             className="App-link"
             href="https://github.com/breakfastmeansbreakfast"
